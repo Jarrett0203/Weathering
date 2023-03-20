@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">Weathering</string>
+    <string name="location_off_string">Turn on your location!</string>
+    <string name="updated_at">Updated at</string>
+    <string name="openweather">OpenWeather</string>
+</resources>
