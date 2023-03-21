@@ -1,6 +1,16 @@
 <resources>
     <string name="app_name">Weathering</string>
     <string name="location_off_string">Turn on your location!</string>
-    <string name="updated_at">Updated at</string>
     <string name="openweather">OpenWeather</string>
+    <string name="error_text">Something went wrong</string>
+    <string name="weather_description">Weather Description</string>
+    <string name="currently_offline">Currently offline</string>
+    <string name="swipe_up_to_refresh">Swipe up to refresh</string>
+    <string name="n_a">N/A</string>
+    <string name="sunrise">Sunrise</string>
+    <string name="sunset">Sunset</string>
+    <string name="data_from">Data from</string>
+    <string name="humidity">Humidity</string>
+    <string name="pressure">Pressure</string>
+    <string name="wind">Wind</string>
 </resources>
