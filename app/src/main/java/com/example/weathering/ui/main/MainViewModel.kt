@@ -30,7 +30,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     )
     private lateinit var sharedPreferences: SharedPreferences
 
-    val weatherListMutableLiveData = MutableLiveData<List<WeatherData>?>()
+    var weatherListMutableLiveData = MutableLiveData<List<WeatherData>?>()
     val currentLocationWeatherData = MutableLiveData<WeatherData?>()
 
     val weatherList: LiveData<List<WeatherData>?>
@@ -39,7 +39,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 loadWeatherData()
                 weatherListMutableLiveData
             } catch (e: Exception) {
-                MutableLiveData(emptyList())
+                weatherListMutableLiveData = MutableLiveData(emptyList())
+                weatherListMutableLiveData
             }
         }
 

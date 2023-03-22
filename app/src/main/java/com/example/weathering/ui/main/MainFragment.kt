@@ -131,7 +131,6 @@ class MainFragment : Fragment() {
                 "Could not connect to the internet.",
                 Toast.LENGTH_SHORT
             ).show()
-            return
         }
 
         if (!isLocationEnabled()) {
