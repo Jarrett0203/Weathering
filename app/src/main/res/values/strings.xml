@@ -13,4 +13,9 @@
     <string name="humidity">Humidity</string>
     <string name="pressure">Pressure</string>
     <string name="wind">Wind</string>
+    <string name="city_name">City Name</string>
+    <string name="max">Max</string>
+    <string name="current">Current</string>
+    <string name="min">Min</string>
+    <string name="error_sample">Failed to get sample cities data</string>
 </resources>

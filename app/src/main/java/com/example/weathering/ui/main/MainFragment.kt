@@ -1,12 +1,15 @@
 package com.example.weathering.ui.main
 
 import android.Manifest
+import android.content.ContentValues.TAG
 import android.content.Context
-import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -15,10 +18,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.weathering.WeatherData
+import com.example.weathering.WeatherListAdapter
 import com.example.weathering.databinding.FragmentMainBinding
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
-import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -72,15 +77,38 @@ class MainFragment : Fragment() {
 
         fusedLocationProviderClient =
             LocationServices.getFusedLocationProviderClient(requireActivity())
-        getCurrentLocation()
+        getWeatherData()
+        if (isInternetConnected()) {
+            mainViewModel.loadWeatherData()
+        }
+
+        binding.sampleCountries.layoutManager = LinearLayoutManager(context)
+        binding.sampleCountries.adapter = WeatherListAdapter(requireContext(), emptyList())
 
         binding.swipeRefresh.setOnRefreshListener {
-            getCurrentLocation()
+            if (isInternetConnected()) {
+                mainViewModel.loadWeatherData()
+            }
+            getWeatherData()
             binding.swipeRefresh.isRefreshing = false
         }
 
-        mainViewModel.weatherData.observe(viewLifecycleOwner) {
-            parseAndDisplayResponse(it)
+        mainViewModel.currentLocationWeatherData.observe(viewLifecycleOwner) {
+            displayResponse(it)
+        }
+
+        mainViewModel.weatherList.observe(viewLifecycleOwner) { weatherList ->
+            weatherList?.let { list ->
+                Log.d(TAG, "Weather list updated: ${list.size}")
+                if (list.isNotEmpty()) {
+                    binding.sampleError.visibility = View.GONE
+                    binding.sampleCountries.visibility = View.VISIBLE
+                    binding.sampleCountries.adapter = WeatherListAdapter(requireContext(), list)
+                } else {
+                    binding.sampleError.visibility = View.VISIBLE
+                    binding.sampleCountries.visibility = View.GONE
+                }
+            }
         }
 
         return root
@@ -91,11 +119,21 @@ class MainFragment : Fragment() {
         _binding = null
     }
 
-    private fun getCurrentLocation() {
+    private fun getWeatherData() {
         if (!checkPermission()) {
             requestPermission()
             return
         }
+
+        if (!isInternetConnected()) {
+            Toast.makeText(
+                requireContext(),
+                "Could not connect to the internet.",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
         if (!isLocationEnabled()) {
             Toast.makeText(
                 requireContext(),
@@ -111,51 +149,43 @@ class MainFragment : Fragment() {
                 val lon = location.longitude
                 mainViewModel.getCurrentWeather(lat, lon)
             } else {
-                mainViewModel.getSavedResponseNoInternet()
+                mainViewModel.getSavedResponseNoLocation()
             }
         }
     }
 
-    private fun parseAndDisplayResponse(response: String?) {
+    private fun displayResponse(weatherData: WeatherData?) {
         try {
-            val jsonObj = JSONObject(response!!)
-            val main = jsonObj.getJSONObject("main")
-            val sys = jsonObj.getJSONObject("sys")
-            val wind = jsonObj.getJSONObject("wind")
-            val weather = jsonObj.getJSONArray("weather").getJSONObject(0)
-            val timeZone = jsonObj.getInt("timezone")
             var gmt = "GMT"
-            if (timeZone > 0) {
+            if (weatherData!!.timeZone!! > 0) {
                 gmt += "+"
             }
-            val timeZoneFormat = gmt + timeZone / 3600
+            val timeZoneFormat = gmt + weatherData.timeZone!! / 3600
             dateFormat.timeZone = TimeZone.getTimeZone(timeZoneFormat)
             timeFormat.timeZone = TimeZone.getTimeZone(timeZoneFormat)
-            val updatedTime = Date(jsonObj.getLong("dt") * 1000)
             val updatedTimeText = String.format(
                 "Updated at %s",
-                dateFormat.format(updatedTime)
+                dateFormat.format(Date(weatherData.updatedTime!!))
             )
-            val temp = String.format("%s°C", main.getString("temp"))
-            val tempMin = String.format("Low Temp: %s°C", main.getString("temp_min"))
-            val tempMax = String.format("High Temp: %s°C", main.getString("temp_max"))
-            val pressure = String.format("%s hPa", main.getString("pressure"))
-            val humidity = String.format("%s%%", main.getString("humidity"))
-            val sunrise: Long = sys.getLong("sunrise") * 1000
-            val sunset: Long = sys.getLong("sunset") * 1000
-            val windSpeed = String.format("%sm/s", wind.getString("speed"))
-            val weatherDescription = weather.getString("description")
-            val location =
-                String.format("%s, %s", jsonObj.getString("name"), sys.getString("country"))
+            val temp = String.format("%s°C", weatherData.temp)
+            val tempMin = String.format("Low Temp: %s°C", weatherData.tempMin)
+            val tempMax = String.format("High Temp: %s°C", weatherData.tempMax)
+            val pressure = String.format("%s hPa", weatherData.pressure)
+            val humidity = String.format("%s%%", weatherData.humidity)
+            val sunrise = timeFormat.format(Date(weatherData.sunrise!!))
+            val sunset = timeFormat.format(Date(weatherData.sunset!!))
+            val windSpeed = String.format("%sm/s", weatherData.wind)
+            val weatherDescription = weatherData.weatherDescription!!.uppercase()
+            val location = String.format("%s, %s", weatherData.name, weatherData.country)
 
             binding.currentLocation.text = location
             binding.updatedTime.text = updatedTimeText
-            binding.status.text = weatherDescription.uppercase()
+            binding.status.text = weatherDescription
             binding.currentTemp.text = temp
             binding.tempMin.text = tempMin
             binding.tempMax.text = tempMax
-            binding.sunrise.text = timeFormat.format(Date(sunrise))
-            binding.sunset.text = timeFormat.format(Date(sunset))
+            binding.sunrise.text = sunrise
+            binding.sunset.text = sunset
             binding.wind.text = windSpeed
             binding.pressure.text = pressure
             binding.humidity.text = humidity
@@ -193,5 +223,13 @@ class MainFragment : Fragment() {
             requireActivity().getSystemService(Context.LOCATION_SERVICE) as LocationManager
         return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
                 || locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+    }
+
+    private fun isInternetConnected(): Boolean {
+        val connectivityManager =
+            requireActivity().getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = connectivityManager.activeNetwork
+        val networkCapabilities = connectivityManager.getNetworkCapabilities(network)
+        return networkCapabilities != null && networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 }
